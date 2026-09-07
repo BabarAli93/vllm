@@ -50,6 +50,8 @@ from vllm.v1.core.sched.request_queue import (
     SchedulingPolicy,
     create_request_queue,
 )
+
+from vllm.v1.core.sched.dsd import DSDGate
 from vllm.v1.core.sched.utils import check_stop, remove_all
 from vllm.v1.engine import EngineCoreEventType, EngineCoreOutput, EngineCoreOutputs
 from vllm.v1.kv_cache_interface import AttentionSpec, KVCacheConfig
@@ -78,6 +80,7 @@ class Scheduler(SchedulerInterface):
         self.vllm_config = vllm_config
         self.scheduler_config = vllm_config.scheduler_config
         self.cache_config = vllm_config.cache_config
+        self.dsd = DSDGate(vllm_config)
         self.lora_config = vllm_config.lora_config
         self.kv_cache_config = kv_cache_config
         self.kv_events_config = vllm_config.kv_events_config
@@ -398,6 +401,12 @@ class Scheduler(SchedulerInterface):
                 # Async scheduling: Avoid scheduling an extra step when we are sure that
                 # the previous step has reached request.max_tokens. We don't schedule
                 # partial draft tokens since this prevents uniform decode optimizations.
+                req_index += 1
+                continue
+
+            if not self.dsd.prepare(request):
+                # Waiting for the Edge drafter, stays in self.running and 
+                # keeping its KV blocks, but contributes zero scheduled tokens.
                 req_index += 1
                 continue
 
@@ -1749,6 +1758,7 @@ class Scheduler(SchedulerInterface):
                 request.streaming_queue = deque()
             self._enqueue_waiting_request(request)
             self.requests[request.request_id] = request
+            self.dsd.enroll(request)
             if self.log_stats:
                 request.record_event(EngineCoreEventType.QUEUED)
 
@@ -1820,6 +1830,7 @@ class Scheduler(SchedulerInterface):
     ) -> dict[str, Any] | None:
         assert request.is_finished()
 
+        self.dsd.finish(request.request_id)
         connector_delay_free_blocks, kv_xfer_params = self._connector_finished(request)
         self.encoder_cache_manager.free(request)
         request_id = request.request_id

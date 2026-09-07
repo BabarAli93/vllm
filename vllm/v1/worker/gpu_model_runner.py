@@ -548,6 +548,9 @@ class GPUModelRunner(
                 )
             elif self.speculative_config.method == "suffix":
                 self.drafter = SuffixDecodingProposer(self.vllm_config)
+            elif self.speculative_config.method == "remote":
+                from vllm.v1.spec_decode.remote_proposer import RemoteProposer
+                self.drafter = RemoteProposer(self.vllm_config)
             elif self.speculative_config.use_eagle():
                 self.drafter = EagleProposer(self.vllm_config, self.device, self)
                 if self.speculative_config.method == "eagle3":
@@ -4503,6 +4506,17 @@ class GPUModelRunner(
                 self.input_batch.token_ids_cpu,
                 slot_mappings=slot_mappings,
             )
+        elif spec_config.method == "remote":
+            # Drafts arrives from a remote edge device via SPEC_TOKENS
+            # and are handled by DSDGate in the scheduler
+            assert isinstance(sampled_token_ids, list)
+            draft_token_ids = self.drafter.propose(
+                sampled_token_ids,
+                self.input_batch.num_tokens_no_spec,
+                self.input_batch.token_ids_cpu,
+                slot_mappings=slot_mappings
+            )
+
         elif spec_config.use_ngram_gpu():
             assert isinstance(self.drafter, NgramProposerGPU)
             (

@@ -55,6 +55,7 @@ SpeculativeMethod = Literal[
     "mlp_speculator",
     "draft_model",
     "suffix",
+    "remote",
     EagleModelTypes,
     NgramGPUTypes,
 ]
@@ -390,6 +391,8 @@ class SpeculativeConfig:
                 self.model = "ngram_gpu"
             elif self.method == "suffix":
                 self.model = "suffix"
+            elif self.method == "remote":
+                self.model = "remote"
             elif self.method == "extract_hidden_states":
                 self.model = "extract_hidden_states"
             else:
@@ -435,6 +438,10 @@ class SpeculativeConfig:
             self.draft_parallel_config = self.target_parallel_config
         elif self.method == "suffix":
             self._validate_suffix_decoding()
+        elif self.method == "remote":
+            # The draft model is deployed in an edge device
+            self.prompt_lookup_max = 0
+            self.prompt_lookup_min = 0
         elif self.method == "extract_hidden_states":
             from vllm.transformers_utils.configs.extract_hidden_states import (
                 ExtractHiddenStatesConfig,
@@ -870,7 +877,7 @@ class SpeculativeConfig:
         method = self.method
         model = (
             None
-            if method in ("ngram", "suffix", "extract_hidden_states")
+            if method in ("ngram", "suffix", "remote", "extract_hidden_states")
             else self.draft_model_config.model
         )
         num_spec_tokens = self.num_speculative_tokens

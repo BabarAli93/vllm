@@ -1051,6 +1051,15 @@ class AsyncMPClient(MPClient):
         if request_ids and not self.resources.engine_dead:
             await self._send_input(EngineCoreRequestType.ABORT, request_ids)
 
+    async def add_spec_tokens_async(self, request_id: str, 
+                                    ctx_len: int, token_ids: list[int]) -> None:
+        if self.resources.engine_dead:
+            return
+        await self._send_input(
+            EngineCoreRequestType.SPEC_TOKENS, 
+            {"request_id": request_id, "ctx_len": ctx_len, "token_ids": token_ids}
+        )
+
     async def pause_scheduler_async(
         self, mode: PauseMode = "abort", clear_cache: bool = True
     ) -> None:

@@ -1264,6 +1264,8 @@ class EngineCoreProc(EngineCore):
             self._invoke_utility_method(method_name, get_result, output, enqueue_output)
         elif request_type == EngineCoreRequestType.EXECUTOR_FAILED:
             raise RuntimeError("Executor failed.")
+        elif request_type == EngineCoreRequestType.SPEC_TOKENS:
+            self.scheduler.dsd.submit(request)
         else:
             logger.error(
                 "Unrecognized input request type encountered: %s", request_type

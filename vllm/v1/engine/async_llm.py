@@ -402,6 +402,13 @@ class AsyncLLM(EngineClient):
             )
         return queue
 
+    async def add_spec_tokens(self, 
+                              request_id: str, ctx_len: int, 
+                              token_ids: list[int]) -> None:
+        """Supply externally drafted tokens to the engine for speculative decoding."""
+        await self.engine_core.add_spec_tokens_async(
+            request_id, ctx_len, token_ids)
+
     async def _add_request(
         self,
         request: EngineCoreRequest,
