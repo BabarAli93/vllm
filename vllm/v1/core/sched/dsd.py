@@ -54,6 +54,7 @@ class DSDGate:
     def enroll(self, request) -> None:
         params = getattr(request, "sampling_params", None)
         extra = getattr(params, "extra_args", None) or {}
+        logger.warning("DSD enroll: request_id=%s, extra=%s", request.request_id, extra)
         if extra.get("remote_spec"):
             self.reqs.add(request.request_id)
             self.stats["enrolled"] += 1
@@ -80,8 +81,8 @@ class DSDGate:
 
         if rid not in self.reqs:
             # Finished, aborted, or never a DSD request.
-            self.stats["orphaned"] += 1
-            return
+            self.reqs.add(rid)  # enroll it so we don't log again
+            self.stats["enrolled"] += 1
 
         # A newer draft always supersedes an older one: the client sends draft
         # N+1 only after receiving verification N, so at most one is in flight.
@@ -160,6 +161,7 @@ class DSDGate:
         self.reqs.discard(request_id)
         self.buf.pop(request_id, None)
         self.deadline.pop(request_id, None)
+        logger.warning(f"DSD stats: {self.stats}")
 
     def log_stats(self) -> None:
         logger.info("DSD %s inflight=%d enrolled=%d",
